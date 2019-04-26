@@ -48,6 +48,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifndef AI_IMPORTER_DESC_H_INC
 #define AI_IMPORTER_DESC_H_INC
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /** Mixed set of flags for #aiImporterDesc, indicating some features
   *  common to many importers*/
@@ -142,5 +145,8 @@ Will return a NULL-pointer if no assigned importer desc. was found for the given
     \return A pointer showing to the ImporterDesc, \see aiImporterDesc.
 */
 ASSIMP_API const C_STRUCT aiImporterDesc* aiGetImporterDesc( const char *extension );
+#ifdef __cplusplus
+}
+#endif
 
 #endif // AI_IMPORTER_DESC_H_INC
