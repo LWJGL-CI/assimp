@@ -18,18 +18,30 @@ addons:
 #    - gcc-4.9
 #    - g++-4.9
     - cmake
+    - gcc-aarch64-linux-gnu
+    - g++-aarch64-linux-gnu
+    - libc6-dev-arm64-cross
 
 before_install:
 - pip install --user awscli
 - export PATH=$PATH:$HOME/.local/bin
+- sudo sed -i 's/deb http/deb [arch=amd64,i386] http/' /etc/apt/sources.list
+- cat /etc/apt/sources.list
+- sudo grep "ubuntu.com/ubuntu" /etc/apt/sources.list | sudo tee /etc/apt/sources.list.d/ports.list
+- sudo sed -i 's/amd64,i386/armhf,arm64/' /etc/apt/sources.list.d/ports.list
+- sudo sed -i 's#http://.*/ubuntu#http://ports.ubuntu.com/ubuntu-ports#' /etc/apt/sources.list.d/ports.list
+- cat /etc/apt/sources.list.d/ports.list
+- sudo dpkg --add-architecture arm64
+- sudo apt-get update || true
+- sudo apt-get -yq --no-install-suggests --no-install-recommends install zlib1g-dev:arm64
 
 script:
 - mkdir build
 - cd build
 #- CC="gcc-4.9" CXX="g++-4.9" cmake -DASSIMP_BUILD_ASSIMP_TOOLS=OFF -DASSIMP_BUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0" -DCMAKE_SHARED_LINKER_FLAGS=-Wl,--wrap,memcpy ..
-- cmake -DASSIMP_BUILD_ASSIMP_TOOLS=OFF -DASSIMP_BUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0" -DCMAKE_SHARED_LINKER_FLAGS=-Wl,--wrap,memcpy ..
+- CC="aarch64-linux-gnu-gcc" CXX="aarch64-linux-gnu-g++" cmake -DASSIMP_BUILD_ASSIMP_TOOLS=OFF -DASSIMP_BUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0" -DCMAKE_SHARED_LINKER_FLAGS=-Wl,--wrap,memcpy ..
 - cmake --build .
-- strip code/libassimp.so
-- "aws s3 cp code/libassimp.so s3://build.lwjgl.org/nightly/linux/x64/ --acl public-read --cache-control \"public, must-revalidate, proxy-revalidate, max-age=0\""
+- aarch64-linux-gnu-strip code/libassimp.so
+- "aws s3 cp code/libassimp.so s3://build.lwjgl.org/nightly/linux/arm64/ --acl public-read --cache-control \"public, must-revalidate, proxy-revalidate, max-age=0\""
 - "git log --first-parent --pretty=format:%H HEAD~2..HEAD~1 > revision.git"
-- "aws s3 cp revision.git s3://build.lwjgl.org/nightly/linux/x64/libassimp.so.git --acl public-read --cache-control \"public, must-revalidate, proxy-revalidate, max-age=0\""
+- "aws s3 cp revision.git s3://build.lwjgl.org/nightly/linux/arm64/libassimp.so.git --acl public-read --cache-control \"public, must-revalidate, proxy-revalidate, max-age=0\""
