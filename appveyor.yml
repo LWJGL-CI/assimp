@@ -1,81 +1,46 @@
-# AppVeyor file
-# http://www.appveyor.com/docs/appveyor-yml
-
-# clone directory
-clone_folder: c:\projects\assimp
-
-clone_depth: 1
-
-# branches to build
-branches:
-  # whitelist
-  only:
-    - master
-
+version: '{build}'
+skip_tags: true
+image: Visual Studio 2019
+clone_depth: 3
+environment:
+  CMAKE_BUILD_PARALLEL_LEVEL: 4
+  AWS_ACCESS_KEY_ID:
+    secure: 7jhk0oV/vjFsOcsAHLMUcNGUGLuGmnuPxGH0ce/Vky8=
+  AWS_SECRET_ACCESS_KEY:
+    secure: 5KKYpsIHwYHHh5ud0U7Ss0rLumv6G8tkS6abh1B9aq4wY6+1kq5fN/3E5BsdBVKy
+  AWS_DEFAULT_REGION: us-east-1
+  S3_CONFIG_VOLATILE: --acl public-read --cache-control "public, must-revalidate, proxy-revalidate, max-age=0"
+  GIT_FORMAT: '%%H'
+  matrix:
+  - ARCH: x64
+    PLATFORM: x64
+  - ARCH: x86
+    PLATFORM: Win32
 matrix:
   fast_finish: true
-    
-image:
-  - Visual Studio 2013
-  - Visual Studio 2015
-  - Visual Studio 2017
-  - Visual Studio 2019
-  - MinGW  
-    
-platform:
-  - Win32
-  - x64
-  
-configuration: Release
-
-install:
-  - set PATH=C:\Ruby24-x64\bin;%PATH%
-  - set CMAKE_DEFINES -DASSIMP_WERROR=ON
-  - if [%COMPILER%]==[MinGW] set PATH=C:\MinGW\bin;%PATH%
-  - if "%APPVEYOR_BUILD_WORKER_IMAGE%"=="Visual Studio 2013" set CMAKE_GENERATOR_NAME=Visual Studio 12 2013
-  - if "%APPVEYOR_BUILD_WORKER_IMAGE%"=="Visual Studio 2015" set CMAKE_GENERATOR_NAME=Visual Studio 14 2015
-  - if "%APPVEYOR_BUILD_WORKER_IMAGE%"=="Visual Studio 2017" set CMAKE_GENERATOR_NAME=Visual Studio 15 2017
-  - if "%APPVEYOR_BUILD_WORKER_IMAGE%"=="Visual Studio 2019" set CMAKE_GENERATOR_NAME=Visual Studio 16 2019
-  - cmake %CMAKE_DEFINES% -G "%CMAKE_GENERATOR_NAME%" -A %platform% .
-  # Rename sh.exe as sh.exe in PATH interferes with MinGW  - if "%APPVEYOR_BUILD_WORKER_IMAGE%"=="Visual Studio 2015" set CMAKE_GENERATOR_NAME=Visual Studio 14 2015
-
-  - rename "C:\Program Files\Git\usr\bin\sh.exe" "sh2.exe"
-  - set PATH=%PATH%;"C:\\Program Files (x86)\\Inno Setup 5"
-  - ps: Invoke-WebRequest -Uri https://download.microsoft.com/download/5/7/b/57b2947c-7221-4f33-b35e-2fc78cb10df4/vc_redist.x64.exe -OutFile .\packaging\windows-innosetup\vc_redist.x64.exe
-  - ps: Invoke-WebRequest -Uri https://download.microsoft.com/download/1/d/8/1d8137db-b5bb-4925-8c5d-927424a2e4de/vc_redist.x86.exe -OutFile .\packaging\windows-innosetup\vc_redist.x86.exe
-  
-cache:
-  - code\assimp.dir\%CONFIGURATION%
-  - contrib\zlib\zlibstatic.dir\%CONFIGURATION%
-  - contrib\zlib\zlib.dir\%CONFIGURATION%
-  - tools\assimp_cmd\assimp_cmd.dir\%CONFIGURATION%
-  - tools\assimp_view\assimp_viewer.dir\%CONFIGURATION%
-  - test\unit.dir\%CONFIGURATION%
-  - bin\.mtime_cache
-  
-before_build:
-  - echo NUMBER_OF_PROCESSORS=%NUMBER_OF_PROCESSORS%
-  - ruby scripts\AppVeyor\mtime_cache -g scripts\AppVeyor\cacheglobs.txt -c bin\.mtime_cache\cache.json
-  
 build_script:
-  cmake --build . --config Release -- /maxcpucount:2
-  
-after_build:
-  - if "%APPVEYOR_BUILD_WORKER_IMAGE%"=="Visual Studio 2017" (
-        if "%platform%"=="x64" (
-            iscc packaging\windows-innosetup\script_x64.iss
-        ) else (
-            iscc packaging\windows-innosetup\script_x86.iss
-        )
-    )
-  - 7z a assimp.7z bin\%CONFIGURATION%\* lib\%CONFIGURATION%\*
+- cmd: >-
+    mkdir build
 
-test_script:
-  - cmd: bin\%CONFIGURATION%\unit.exe --gtest_output=xml:testout.xml
+    cd build
 
-on_finish:
-  - ps: (new-object net.webclient).UploadFile("https://ci.appveyor.com/api/testresults/junit/$($env:APPVEYOR_JOB_ID)", (Resolve-Path .\testout.xml))
-  
-artifacts:
-  - path: assimp.7z
-    name: assimp_lib
+    cmake -G "Visual Studio 16 2019" -A %PLATFORM% -DASSIMP_BUILD_ASSIMP_TOOLS=OFF -DASSIMP_BUILD_TESTS=OFF -DCMAKE_C_FLAGS_RELEASE="/MT /EHsc /Ox /GF /Gy /GL /GS- /DNDEBUG" -DCMAKE_CXX_FLAGS_RELEASE="/MT /EHsc /Ox /GF /Gy /GL /GS- /DNDEBUG" -DCMAKE_SHARED_LINKER_FLAGS_RELEASE="/OPT:REF,ICF /LTCG /INCREMENTAL:NO" ..
+
+    cmake --build . --config Release
+
+    aws s3 cp code\Release\assimp-vc142-mt.dll s3://build.lwjgl.org/nightly/windows/%ARCH%/assimp.dll %S3_CONFIG_VOLATILE%
+
+    cd ..
+
+    git log --first-parent --pretty=format:%GIT_FORMAT% HEAD~2..HEAD~1 > revision.git
+
+    aws s3 cp revision.git s3://build.lwjgl.org/nightly/windows/%ARCH%/assimp.dll.git %S3_CONFIG_VOLATILE%
+test: off
+notifications:
+- provider: Email
+  to:
+  - iotsakp@gmail.com
+  subject: Assimp CI
+  on_build_success: true
+  on_build_failure: true
+  on_build_status_changed: true

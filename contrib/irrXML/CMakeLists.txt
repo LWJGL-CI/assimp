@@ -14,7 +14,7 @@ if ( MSVC )
 endif ( MSVC )
 
 IF(CMAKE_SYSTEM_NAME MATCHES "(Darwin|FreeBSD)")
-  add_library(IrrXML ${IrrXML_SRCS})
+  add_library(IrrXML STATIC ${IrrXML_SRCS})
 ELSE()
   add_library(IrrXML STATIC ${IrrXML_SRCS})
 ENDIF()

@@ -1,78 +1,138 @@
-sudo: required
-language: cpp
-
-cache: ccache
-
-before_install:
-  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then sudo apt-get update -qq && sudo apt-get install cmake cppcheck && sudo apt-get install cmake python3 && sudo apt-get install -qq freeglut3-dev libxmu-dev libxi-dev ; echo -n | openssl s_client -connect scan.coverity.com:443 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | sudo tee -a /etc/ssl/certs/ca- ; fi
-  - 'if [ "$TRAVIS_OS_NAME" = "osx" ];  then
-       if brew ls --versions cmake > /dev/null; then
-         echo cmake already installed.;
-       else
-         brew install cmake;
-       fi;
-       brew install python3;
-       brew install homebrew/x11/freeglut; 
-    fi'
-  - echo -e "#ifndef A_R_H_INC\n#define A_R_H_INC\n#define GitVersion ${TRAVIS_JOB_ID}\n#define GitBranch \"${TRAVIS_BRANCH}\"\n#endif // A_R_H_INC" > revision.h
-  # install latest LCOV (1.9 was failing)
-  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then cd ${TRAVIS_BUILD_DIR} && wget http://ftp.de.debian.org/debian/pool/main/l/lcov/lcov_1.11.orig.tar.gz && tar xf lcov_1.11.orig.tar.gz && sudo make -C lcov-1.11/ install && gem install coveralls-lcov && lcov --version && g++ --version ; fi
-
-os:
-  - linux
-
-compiler:
-  - gcc
-  - clang
-
+git:
+  depth: 3
 env:
   global:
-    - secure: "lZ7pHQvl5dpZWzBQAaIMf0wqrvtcZ4wiZKeIZjf83TEsflW8+z0uTpIuN30ZV6Glth/Sq1OhLnTP5+N57fZU/1ebA5twHdvP4bS5CIUUg71/CXQZNl36xeaqvxsG/xRrdpKOsPdjAOsQ9KPTQulsX43XDLS7CasMiLvYOpqKcPc="
-    - PV=r8e PLATF=linux-x86_64 NDK_HOME=${TRAVIS_BUILD_DIR}/android-ndk-${PV} PATH=${PATH}:${NDK_HOME}
-
-git:
-  depth: 1
+  - secure: "mD3RBWzc5aThrUKa60flWefcyZf2RWqtz15x7/keuIuVZVLs6pxxJr2W5jAY945iJRxSpvkiWYaa4ADjcNUitJ2xSaF9K9onn83QD7i03+4fyptqa7ZU3CJx+J+BmiKQT4vbFhzMEjxwHWQsQ5ufXeEW+O1irJl/IEUUpJPsn7eaiwR6Ke5HfhCQ13M/efHceewKfvUMcMPkL3xPAyzgor5QEns7UNUdSGUPplrNGYOoy8p1F6WSwhF1c0OymhN7RMGRvG2krgOeyFaw7lQeIjJZoU1xRb0GSydAF/EiL18bCSyxOfQtVHoPVurQ6OZYamV6qP7SbdIJyFewvcp2wUH7h8DgGbie2/fOw2CpjhSJqyqWWHZdvZJt0gM4MA/CtdDre5M6SUIq0FrNC+qIF6ROfcwvlUpcOfV78bo4UWo6aBV0CvJ5KmZl6fCiAUhjuOMVCnx6SHrrjiyD1YPa7pDLRenHM66rrttgI+39WvuF1cInCD/XOinNy7gbxE+gA2OtVhKQCixaTFchLPuG8lrLTIhyteHk+D/FaP0TeF2sTJ4coze1M1XuXCyDlHEc+lgMsR0zNNtgAQeQANVeKh9ITkJWfxELLv7S/W9axySWseWxC0S4Y2PN0JALcAZjNwq73uLWCgiOPHIs+ygVlYEUHyTOPDHHcR6LEOeMBpo="
+  - secure: "grDEa1Q6hFWa72y9Ljh4oxzGECH3ELCByPpljWPdvesbNWQy2vZ1rMV0ri/LlLG10wNnofG78558TwSZTJ088gqdeUZn/a9A2QPsIFijXR6Tsr4oT6bXbbjxyp/akLOSDUcQnAAlUZBDn8DkKkgrCda7sDlOBj3/RWYHcXy7O2Fn0h3IZ8TAKEH4ImLBFIaXEnGJghGHKKtuLVUj234rZv1oXRzpQnE+rMOBUF+hhjoTymc6wurI3vs9rIGfOwLXXrJ45LQFN69b4iIm0+nuwISUsOJ3+bZL0QlZRpW4lwSKq2TXJWFdGYd5flwF9D+ZQ6Bz02q8pZsKNCcJBzBoJS4JslQiGRNhj7SQZd/6e9SiDzOupFFjTLgLLpXubXqw4AHPYJ+hJiasbYOV9XBI8rPT8NKY7w/zRbKExNW2LymckEj5v8BSGPaNMeTJ/ly7txX3qrra5ogmvY82kXJjo9w4YJ9bCj8ZONegAhN7b5BxSubbt9bCjKdvSEZKKmsEBKF/bCY9KgLoRDzJ4WYTNHQtnZNpbL4D6xmiytkmNQCgSMZxt6C8tWq5hjmk9v65M7v+7GdfXvC6c1rzH/raYmF6R7RrH82R1CMMKiLBHFGAYtE/OXbsYOHr0ROefGvmE8igzwafhDe4sIJbs/4ZO2KpbmsSaeV0RfDVefobipM="
+  - AWS_DEFAULT_REGION: "us-east-1"
+  - S3_PARAMS: '"--acl public-read --cache-control \"public,must-revalidate,proxy-revalidate,max-age=0\""'
+  - CMAKE_BUILD_PARALLEL_LEVEL: 4
+  - LINUX_CMAKE_PARAMS: '"-DASSIMP_BUILD_ASSIMP_TOOLS=OFF -DASSIMP_BUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release"'
 
 matrix:
   include:
-    - os: linux
-      compiler: clang
-      env: ASAN=ON
-    - os: linux
-      compiler: clang
-      env: UBSAN=ON
-    - os: linux
-      compiler: clang
-      env: SHARED_BUILD=ON
-    - os: linux
-      compiler: gcc
-      env: ANALYZE=ON
-    - os: linux
-      compiler: gcc
-      env: ENABLE_COVERALLS=ON
-    - os: linux
-      compiler: gcc
-      env: SHARED_BUILD=ON
 
-install:
-  - if [ $ANDROID ]; then wget -c http://dl.google.com/android/ndk/android-ndk-${PV}-${PLATF}.tar.bz2 && tar xf android-ndk-${PV}-${PLATF}.tar.bz2 ; fi
+  # -----------------
+  - name: "Linux x64"
+  # -----------------
+    dist: xenial
+    language: c
+    compiler: gcc
 
-before_script:
-  cmake . -DASSIMP_ENABLE_BOOST_WORKAROUND=YES
+    addons:
+      apt:
+        packages:
+        - cmake
+        - gcc-4.8
+        - g++-4.8
 
-script:
-  - export COVERALLS_SERVICE_NAME=travis-ci
-  - export COVERALLS_REPO_TOKEN=abc12345
-  - . ./.travis.sh
- 
-after_success:
-  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then cd ${TRAVIS_BUILD_DIR} && lcov --directory . --capture --output-file coverage.info && lcov --remove coverage.info '/usr/*' 'contrib/*' 'test/*' --output-file coverage.info && lcov --list coverage.info && coveralls-lcov --source-encoding=ISO-8859-1 --repo-token=${COVERALLS_TOKEN} coverage.info ; fi
+    before_install:
+    - pip install --user awscli
+    - export PATH=$PATH:$HOME/.local/bin
 
-addons:
-  coverity_scan:
-    project:
-      name: "assimp/assimp"
-    notification_email: kim.kulling@googlemail.com
-    build_command_prepend: "cmake ./"
-    build_command: "make -j4"
-    branch_pattern: coverity_scan
+    script:
+    - mkdir build
+    - cd build
+    - "CC=gcc-4.8 CXX=g++-4.8 cmake $LINUX_CMAKE_PARAMS -DCMAKE_C_FLAGS=\"-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0\" -DCMAKE_SHARED_LINKER_FLAGS=-Wl,--wrap,memcpy .."
+    - cmake --build .
+    - strip code/libassimp.so
+    - "git log --first-parent --pretty=format:%H HEAD~2..HEAD~1 > revision.git"
+    - "aws s3 cp code/libassimp.so s3://build.lwjgl.org/nightly/linux/x64/ $S3_PARAMS"
+    - "aws s3 cp revision.git s3://build.lwjgl.org/nightly/linux/x64/libassimp.so.git $S3_PARAMS"
+
+  # -----------------
+  - name: "Linux arm32"
+  # -----------------
+    dist: xenial
+    language: c
+    compiler: gcc
+
+    addons:
+      apt:
+        packages:
+        - cmake
+        - gcc-4.8-arm-linux-gnueabihf
+        - g++-4.8-arm-linux-gnueabihf
+        - libc6-dev-armhf-cross
+
+    before_install:
+    - pip install --user awscli
+    - export PATH=$PATH:$HOME/.local/bin
+    - sudo sed -i 's/deb http/deb [arch=amd64,i386] http/' /etc/apt/sources.list
+    - sudo grep "ubuntu.com/ubuntu" /etc/apt/sources.list | sudo tee /etc/apt/sources.list.d/ports.list
+    - sudo sed -i 's/amd64,i386/armhf,arm64/' /etc/apt/sources.list.d/ports.list
+    - sudo sed -i 's#http://.*/ubuntu#http://ports.ubuntu.com/ubuntu-ports#' /etc/apt/sources.list.d/ports.list
+    - sudo dpkg --add-architecture armhf
+    - sudo apt-get update || true
+    - sudo apt-get -yq install zlib1g-dev:armhf
+    #- sudo apt-get -yq --no-install-suggests --no-install-recommends install zlib1g-dev:armhf
+
+    script:
+    - mkdir build
+    - cd build
+    - "CC=arm-linux-gnueabihf-gcc-4.8 CXX=arm-linux-gnueabihf-g++-4.8 cmake $LINUX_CMAKE_PARAMS -DCMAKE_C_FLAGS=\"-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0\" .."
+    - cmake --build .
+    - arm-linux-gnueabihf-strip code/libassimp.so
+    - "git log --first-parent --pretty=format:%H HEAD~2..HEAD~1 > revision.git"
+    - "aws s3 cp code/libassimp.so s3://build.lwjgl.org/nightly/linux/arm32/ $S3_PARAMS"
+    - "aws s3 cp revision.git s3://build.lwjgl.org/nightly/linux/arm32/libassimp.so.git $S3_PARAMS"
+
+  # -----------------
+  - name: "Linux arm64"
+  # -----------------
+    dist: xenial
+    language: c
+    compiler: gcc
+
+    addons:
+      apt:
+        packages:
+        - cmake
+        - gcc-4.8-aarch64-linux-gnu
+        - g++-4.8-aarch64-linux-gnu
+        - libc6-dev-arm64-cross
+
+    before_install:
+    - pip install --user awscli
+    - export PATH=$PATH:$HOME/.local/bin
+    - sudo sed -i 's/deb http/deb [arch=amd64,i386] http/' /etc/apt/sources.list
+    - sudo grep "ubuntu.com/ubuntu" /etc/apt/sources.list | sudo tee /etc/apt/sources.list.d/ports.list
+    - sudo sed -i 's/amd64,i386/armhf,arm64/' /etc/apt/sources.list.d/ports.list
+    - sudo sed -i 's#http://.*/ubuntu#http://ports.ubuntu.com/ubuntu-ports#' /etc/apt/sources.list.d/ports.list
+    - sudo dpkg --add-architecture arm64
+    - sudo apt-get update || true
+    - sudo apt-get -yq install zlib1g-dev:arm64
+    #- sudo apt-get -yq --no-install-suggests --no-install-recommends install zlib1g-dev:arm64
+
+    script:
+    - mkdir build
+    - cd build
+    - "CC=aarch64-linux-gnu-gcc-4.8 CXX=aarch64-linux-gnu-g++-4.8 cmake $LINUX_CMAKE_PARAMS -DCMAKE_C_FLAGS=\"-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0\" .."
+    - cmake --build .
+    - aarch64-linux-gnu-strip code/libassimp.so
+    - "git log --first-parent --pretty=format:%H HEAD~2..HEAD~1 > revision.git"
+    - "aws s3 cp code/libassimp.so s3://build.lwjgl.org/nightly/linux/arm64/ $S3_PARAMS"
+    - "aws s3 cp revision.git s3://build.lwjgl.org/nightly/linux/arm64/libassimp.so.git $S3_PARAMS"
+
+  # -----------------
+  - name: "macOS"
+  # -----------------
+    language: objective-c
+    osx_image: xcode11.3
+    compiler: clang
+
+    before_install:
+    - brew update
+
+    install:
+    - brew install awscli
+
+    script:
+    - mkdir build
+    - cd build
+    - "cmake $LINUX_CMAKE_PARAMS -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9 .."
+    - cmake --build .
+    - strip -u -r code/libassimp.dylib
+    - "git log --first-parent --pretty=format:%H HEAD~2..HEAD~1 > revision.git"
+    - "aws s3 cp code/libassimp.dylib s3://build.lwjgl.org/nightly/macosx/x64/ $S3_PARAMS"
+    - "aws s3 cp revision.git s3://build.lwjgl.org/nightly/macosx/x64/libassimp.dylib.git $S3_PARAMS"

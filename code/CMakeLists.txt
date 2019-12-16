@@ -199,6 +199,9 @@ SET( Common_SRCS
   Common/simd.h
   Common/simd.cpp
 )
+if ("$ENV{TRAVIS_JOB_NAME}" STREQUAL "Linux x64")
+  list(APPEND Common_SRCS wrap_memcpy.c)
+endif() 		  
 SOURCE_GROUP(Common FILES ${Common_SRCS})
 
 SET( CApi_SRCS
