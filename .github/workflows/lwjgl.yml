@@ -1,0 +1,173 @@
+name: LWJGL Build
+
+on:
+  push:
+    branches:
+      - master
+
+env:
+  AWS_DEFAULT_REGION: us-east-1
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  S3_PARAMS: --cache-control "public,must-revalidate,proxy-revalidate,max-age=0"
+
+jobs:
+  linux:
+    name: Linux
+    runs-on: ${{matrix.runner}}
+    strategy:
+      fail-fast: false
+      matrix:
+        ARCH: [x64, arm32, arm64]
+        include:
+          # -----
+          - ARCH: x64
+            runner: ubuntu-18.04
+            PACKAGES:
+            CC:
+            STRIP: strip
+          # -----
+          - ARCH: arm32
+            runner: ubuntu-18.04
+            CROSS_ARCH: armhf
+            PACKAGES: gcc-arm-linux-gnueabihf g++-arm-linux-gnueabihf libc6-dev-armhf-cross
+            CROSS_PACKAGES: zlib1g-dev:armhf libc6-dev:armhf
+            CC: CC=arm-linux-gnueabihf-gcc CXX=arm-linux-gnueabihf-g++
+            STRIP: arm-linux-gnueabihf-strip
+          # -----
+          - ARCH: arm64
+            runner: ubuntu-18.04
+            CROSS_ARCH: arm64
+            PACKAGES: gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libc6-dev-arm64-cross
+            CROSS_PACKAGES: zlib1g-dev:arm64 libc6-dev:arm64
+            CC: CC=aarch64-linux-gnu-gcc CXX=aarch64-linux-gnu-g++
+            STRIP: aarch64-linux-gnu-strip
+          # -----
+#          - ARCH: mips64
+#            runner: ubuntu-18.04
+#            CROSS_ARCH: mips64el
+#            PACKAGES: gcc-mips64el-linux-gnuabi64 g++-mips64el-linux-gnuabi64 libc6-dev-mips64el-cross
+#            CROSS_PACKAGES: zlib1g-dev:mips64el
+#            CC: CC=mips64el-linux-gnuabi64-gcc CXX=mips64el-linux-gnuabi64-g++
+#            CMAKE_PARAMS:
+#            STRIP: mips64el-linux-gnuabi64-strip
+    env:
+      LWJGL_ARCH: ${{matrix.ARCH}}
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 3
+      - run: |
+          sudo apt-get update
+          sudo apt-get -yq install ${{matrix.PACKAGES}}
+        name: Install dependencies
+      - run: |
+          if [[ "${{matrix.ARCH}}" != "mips64" ]]
+          then
+            sudo sed -i 's/deb http/deb [arch=amd64,i386] http/' /etc/apt/sources.list
+            sudo grep "ubuntu.com/ubuntu" /etc/apt/sources.list | sudo tee /etc/apt/sources.list.d/ports.list
+            sudo sed -i 's/amd64,i386/armhf,arm64/' /etc/apt/sources.list.d/ports.list
+            sudo sed -i 's#http://.*/ubuntu#http://ports.ubuntu.com/ubuntu-ports#' /etc/apt/sources.list.d/ports.list
+          else
+            sudo rm -rf /etc/apt/sources.list
+            sudo sh -c "echo 'deb http://deb.debian.org/debian stretch main' >> /etc/apt/sources.list"
+          fi
+          sudo dpkg --add-architecture ${{matrix.CROSS_ARCH}}
+          sudo apt-get update || true
+        if: contains(matrix.ARCH, 'x64') != true
+        name: Prepare cross-compilation
+      - run: sudo apt-get -yq --allow-unauthenticated --no-install-suggests --no-install-recommends install ${{matrix.CROSS_PACKAGES}} -o Dpkg::Options::="--force-overwrite"
+        if: contains(matrix.ARCH, 'x64') != true
+        name: Install cross-compilation dependencies
+      - run: |
+          mkdir build
+          cd build
+          ${{matrix.CC}} cmake -DASSIMP_BUILD_ASSIMP_TOOLS=OFF -DASSIMP_BUILD_TESTS=OFF -DASSIMP_BUILD_DRACO=ON -DASSIMP_BUILD_ZLIB=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0" ..
+        name: Configure build
+      - run: |
+          cd build
+          cmake --build .
+          ${{matrix.STRIP}} bin/libassimp.so
+        name: Build
+      - run: |
+          aws s3 cp build/bin/libassimp.so s3://lwjgl-build/nightly/linux/${{matrix.ARCH}}/ $S3_PARAMS
+          aws s3 cp build/bin/libdraco.so s3://lwjgl-build/nightly/linux/${{matrix.ARCH}}/ $S3_PARAMS
+        name: Upload artifacts
+      - run: |
+          git log --first-parent --pretty=format:%H HEAD~2..HEAD~1 > libassimp.so.git
+          aws s3 cp libassimp.so.git s3://lwjgl-build/nightly/linux/${{matrix.ARCH}}/ $S3_PARAMS
+        name: Upload git revision
+
+  macos:
+    name: macOS
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        ARCH: [x64, arm64]
+        include:
+          - ARCH: x64
+            CMAKE_PARAMS: -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9
+          - ARCH: arm64
+            CMAKE_PARAMS: -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 -DCMAKE_OSX_ARCHITECTURES=arm64
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 3
+      - run: |
+          mkdir build
+          cd build
+          cmake -DASSIMP_BUILD_ASSIMP_TOOLS=OFF -DASSIMP_BUILD_TESTS=OFF -DASSIMP_BUILD_DRACO=ON -DASSIMP_BUILD_ZLIB=ON -DCMAKE_BUILD_TYPE=Release ${{matrix.CMAKE_PARAMS}} ..
+        name: Configure build
+      - run: |
+          cd build
+          cmake --build .
+          strip -u -r bin/libassimp.dylib
+        name: Build
+      - run: |
+          aws s3 cp build/bin/libassimp.dylib s3://lwjgl-build/nightly/macosx/${{matrix.ARCH}}/ $S3_PARAMS
+          aws s3 cp build/bin/libdraco.dylib s3://lwjgl-build/nightly/macosx/${{matrix.ARCH}}/ $S3_PARAMS
+        name: Upload artifacts
+      - run: |
+          git log --first-parent --pretty=format:%H HEAD~2..HEAD~1 > libassimp.dylib.git
+          aws s3 cp libassimp.dylib.git s3://lwjgl-build/nightly/macosx/${{matrix.ARCH}}/ $S3_PARAMS
+        name: Upload git revision
+
+  windows:
+    name: Windows
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        ARCH: [x86, x64, arm64]
+        include:
+          - ARCH: x86
+            PLATFORM: Win32
+          - ARCH: x64
+            PLATFORM: x64
+          - ARCH: arm64
+            PLATFORM: ARM64
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 3
+      # disabled Link Time Optimization for Draco
+      - run: |
+          mkdir build
+          cd build
+          cmake -G "Visual Studio 17 2022" -A ${{matrix.PLATFORM}} -DASSIMP_BUILD_ASSIMP_TOOLS=OFF -DASSIMP_BUILD_TESTS=OFF -DASSIMP_BUILD_DRACO=ON -DASSIMP_BUILD_ZLIB=ON -DCMAKE_C_FLAGS_RELEASE="/MT /EHsc /Ox /GF /Gy /GS- /DNDEBUG" -DCMAKE_CXX_FLAGS_RELEASE="/MT /EHsc /Ox /GF /Gy /GS- /DNDEBUG" -DCMAKE_SHARED_LINKER_FLAGS_RELEASE="/OPT:REF,ICF /INCREMENTAL:NO" ..
+        shell: cmd
+        name: Configure build
+      - run: |
+          cd build
+          cmake --build . --config Release
+        shell: cmd
+        name: Build
+      - run: |
+          aws s3 cp build\bin\Release\assimp-vc143-mt.dll s3://lwjgl-build/nightly/windows/${{matrix.ARCH}}/assimp.dll ${{env.S3_PARAMS}}
+          aws s3 cp build\bin\Release\draco.dll s3://lwjgl-build/nightly/windows/${{matrix.ARCH}}/ ${{env.S3_PARAMS}}
+        shell: cmd
+        name: Upload artifacts
+      - run: |
+          git log --first-parent --pretty=format:%%H HEAD~2..HEAD~1 > assimp.dll.git
+          aws s3 cp assimp.dll.git s3://lwjgl-build/nightly/windows/${{matrix.ARCH}}/ ${{env.S3_PARAMS}}
+        shell: cmd
+        name: Upload git revision
