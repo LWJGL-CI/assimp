@@ -38,7 +38,7 @@ SET(CMAKE_POLICY_DEFAULT_CMP0012 NEW)
 SET(CMAKE_POLICY_DEFAULT_CMP0074 NEW)
 SET(CMAKE_POLICY_DEFAULT_CMP0092 NEW)
 
-CMAKE_MINIMUM_REQUIRED( VERSION 3.22 )
+CMAKE_MINIMUM_REQUIRED( VERSION 3.17 )
 
 #================================================================================#
 #                    Model formats not enabled by default
@@ -353,7 +353,7 @@ ELSEIF (CMAKE_CXX_COMPILER_ID MATCHES "Clang" )
   IF(NOT ASSIMP_HUNTER_ENABLED)
     SET(CMAKE_POSITION_INDEPENDENT_CODE ON)
   ENDIF()
-  SET(CMAKE_CXX_FLAGS "-fvisibility=hidden -fno-strict-aliasing -Wall -Wno-long-long ${CMAKE_CXX_FLAGS}" )
+  SET(CMAKE_CXX_FLAGS "-fvisibility=hidden -fno-strict-aliasing -Wall -Wno-long-long -Wno-implicit-const-int-float-conversion ${CMAKE_CXX_FLAGS}" )
   SET(CMAKE_C_FLAGS "-fno-strict-aliasing ${CMAKE_C_FLAGS}")
 ELSEIF( MINGW )
   IF (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7.0)
