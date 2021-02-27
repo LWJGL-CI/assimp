@@ -46,6 +46,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #else
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
+#if !defined(__clang__)
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
 #endif
 
 #if defined(__clang__)
