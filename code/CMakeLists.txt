@@ -42,7 +42,7 @@
 # 3) Add libassimp using the file lists (eliminates duplication of file names between
 #    source groups and library command)
 #
-cmake_minimum_required( VERSION 3.22 )
+cmake_minimum_required( VERSION 3.17 )
 SET( HEADER_PATH ../include/assimp )
 
 if(NOT ANDROID AND ASSIMP_ANDROID_JNIIOSYSTEM)
@@ -1410,7 +1410,8 @@ IF (ASSIMP_WARNINGS_AS_ERRORS)
   MESSAGE(STATUS "Treating all warnings as errors (for assimp library only)")
   IF (MSVC)
     IF(CMAKE_CXX_COMPILER_ID MATCHES "Clang" ) # clang-cl
-      TARGET_COMPILE_OPTIONS(assimp PRIVATE -Wall -Werror
+      #TARGET_COMPILE_OPTIONS(assimp PRIVATE -Wall -Werror
+      TARGET_COMPILE_OPTIONS(assimp PRIVATE -Wall
         -Wno-microsoft-enum-value
         -Wno-switch-enum
         -Wno-covered-switch-default
@@ -1459,7 +1460,13 @@ IF (ASSIMP_WARNINGS_AS_ERRORS)
         -Wno-undefined-func-template
         -Wno-declaration-after-statement
         -Wno-deprecated-declarations
-	      -Wno-deprecated-non-prototype
+        -Wno-deprecated-non-prototype
+        -Wno-unsafe-buffer-usage
+        -Wno-newline-eof
+        -Wno-ignored-qualifiers
+        -Wno-shorten-64-to-32
+        -Wno-unused-function
+        -Wno-unreachable-code-break
       )
     ELSE()
       TARGET_COMPILE_OPTIONS(assimp PRIVATE /W4 /WX)
