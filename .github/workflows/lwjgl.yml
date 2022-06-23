@@ -82,7 +82,7 @@ jobs:
       - run: |
           mkdir build
           cd build
-          ${{matrix.CC}} cmake -DASSIMP_BUILD_ASSIMP_TOOLS=OFF -DASSIMP_BUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0" ..
+          ${{matrix.CC}} cmake -DASSIMP_BUILD_ASSIMP_TOOLS=OFF -ASSIMP_BUILD_DRACO=ON -DASSIMP_BUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0" ..
         name: Configure build
       - run: |
           cd build
@@ -114,7 +114,7 @@ jobs:
       - run: |
           mkdir build
           cd build
-          cmake -DASSIMP_BUILD_ASSIMP_TOOLS=OFF -DASSIMP_BUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release ${{matrix.CMAKE_PARAMS}} ..
+          cmake -DASSIMP_BUILD_ASSIMP_TOOLS=OFF -ASSIMP_BUILD_DRACO=ON -DASSIMP_BUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release ${{matrix.CMAKE_PARAMS}} ..
         name: Configure build
       - run: |
           cd build
