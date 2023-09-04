@@ -28,7 +28,7 @@ jobs:
           yum -y install https://packages.endpointdev.com/rhel/7/os/x86_64/endpoint-repo.x86_64.rpm
           yum -y install git
         name: Upgrade git
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 3
       - run: |
@@ -99,7 +99,7 @@ jobs:
           apt-get -y update
           DEBIAN_FRONTEND=noninteractive apt-get -yq install awscli git
         name: Upgrade git
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 3
       - run: DEBIAN_FRONTEND=noninteractive apt-get -yq install cmake ${{matrix.PACKAGES}}
@@ -142,7 +142,7 @@ jobs:
           - ARCH: arm64
             CMAKE_PARAMS: -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 -DCMAKE_OSX_ARCHITECTURES=arm64
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 3
       - run: |
@@ -178,7 +178,7 @@ jobs:
           - ARCH: arm64
             PLATFORM: ARM64
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 3
       # disabled Link Time Optimization for Draco
